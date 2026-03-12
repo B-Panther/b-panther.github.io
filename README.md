@@ -1,1 +1,1 @@
-# B-Panther.github.io
+# b-panther.github.io
