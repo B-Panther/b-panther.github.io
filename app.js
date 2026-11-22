@@ -255,7 +255,7 @@
   function currentMessages() {
     const term = els.searchInput.value.trim().toLowerCase();
     let list = state.messages.slice();
-    if (term) list = list.filter((message) => `${message.from || ''} ${message.subject || ''} ${contentAsText(message.content || '')}`.toLowerCase().includes(term));
+    if (term) list = list.filter((message) => `${message.from || ''} ${message.subject || ''} ${contentAsText(message.content || '', message.charset)}`.toLowerCase().includes(term));
     list.sort((a, b) => els.sortSelect.value === 'oldest' ? dateValue(a) - dateValue(b) : dateValue(b) - dateValue(a));
     return list;
   }
@@ -303,7 +303,7 @@
       subject.textContent = message.subject || '(no subject)';
       const preview = document.createElement('span');
       preview.className = 'message-preview';
-      const messageText = contentAsText(message.content || '');
+      const messageText = contentAsText(message.content || '', message.charset);
       const otp = window.EgMailOtp.analyze(message, messageText);
       preview.textContent = otp.isOtp ? `${otp.provider} verification message` : messageText.replace(/\s+/g, ' ').trim().slice(0, 115) || 'No preview available';
       preview.classList.toggle('otp-list-preview', otp.isOtp);
@@ -347,26 +347,16 @@
     renderMessages();
   }
 
-  function decodeQuotedPrintable(input) {
-    let text = String(input || '').replace(/=\r?\n/g, '');
-    text = text.replace(/(?:=[0-9a-f]{2})+/gi, (sequence) => {
-      const bytes = sequence.match(/=[0-9a-f]{2}/gi).map((part) => parseInt(part.slice(1), 16));
-      try { return new TextDecoder('utf-8', { fatal: false }).decode(new Uint8Array(bytes)); }
-      catch (_) { return bytes.map((byte) => String.fromCharCode(byte)).join(''); }
-    });
-    // Some provider-transformed HTML bodies arrive with the quoted-printable '=' missing before 3D.
-    if (/doctype|border-collapse|font-family|line-height/i.test(text) && (text.match(/3D["']/g) || []).length > 3) {
-      text = text.replace(/(^|[^a-z0-9=])3D(?=["'])/gi, '$1=');
-    }
-    return text.replace(/\b039;/g, "'");
+  function decodeQuotedPrintable(input, charset = 'utf-8') {
+    return window.EgMailContent.decodeQuotedPrintable(input, charset);
   }
 
   function looksLikeHTML(value) {
-    return /<(?:!doctype|html|head|body|table|div|p|span|br|section|article|h[1-6])\b/i.test(value) || /^\s*!doctype\s+html/i.test(value);
+    return window.EgMailContent.looksLikeHTML(value);
   }
 
   function sanitizeEmailDocument(raw) {
-    const normalized = decodeQuotedPrintable(raw);
+    const normalized = window.EgMailContent.decodeEscapedMarkup(raw);
     const doc = new DOMParser().parseFromString(normalized, 'text/html');
     doc.querySelectorAll('script,style,iframe,frame,frameset,object,embed,form,input,button,textarea,select,link,meta,base,svg,math,canvas,video,audio,img,picture,source,head,title').forEach((node) => node.remove());
     const allowed = new Set(['DIV','SPAN','P','BR','HR','H1','H2','H3','H4','H5','H6','STRONG','B','EM','I','U','S','SMALL','SUB','SUP','UL','OL','LI','BLOCKQUOTE','PRE','CODE','TABLE','THEAD','TBODY','TFOOT','TR','TD','TH','A']);
@@ -388,13 +378,23 @@
     return doc.body;
   }
 
-  function renderBody(container, raw) {
+  function renderBody(container, raw, charset = 'utf-8') {
     container.replaceChildren();
     const source = String(raw || '');
     const truncated = source.length > 300000;
     const limited = truncated ? source.slice(0, 300000) : source;
-    if (looksLikeHTML(limited)) {
-      const docBody = sanitizeEmailDocument(limited);
+    const decoded = decodeQuotedPrintable(limited, charset);
+    if (window.EgMailContent.hasFlattenedDocumentArtifacts(decoded)) {
+      const notice = document.createElement('span');
+      notice.className = 'body-notice';
+      notice.textContent = 'Email layout markup was simplified for safe, readable display.';
+      const fallback = document.createElement('pre');
+      fallback.className = 'plain-mail';
+      fallback.textContent = window.EgMailContent.cleanFlattenedDocumentText(decoded, charset)
+        || 'This email contains layout markup but no readable message text.';
+      container.append(notice, fallback);
+    } else if (looksLikeHTML(decoded)) {
+      const docBody = sanitizeEmailDocument(decoded);
       const visibleText = (docBody.textContent || '').replace(/\s+/g, ' ').trim();
       if (visibleText.length > 2) {
         const wrap = document.createElement('div');
@@ -403,13 +403,13 @@
       } else {
         const fallback = document.createElement('pre');
         fallback.className = 'plain-mail';
-        fallback.textContent = decodeQuotedPrintable(limited.replace(/<[^>]*>/g, ' ')).replace(/\s{3,}/g, '\n\n');
+        fallback.textContent = window.EgMailContent.cleanFlattenedDocumentText(decoded.replace(/<[^>]*>/g, ' '), charset).replace(/\s{3,}/g, '\n\n');
         container.append(fallback);
       }
     } else {
       const pre = document.createElement('pre');
       pre.className = 'plain-mail';
-      pre.textContent = decodeQuotedPrintable(limited);
+      pre.textContent = decoded;
       container.append(pre);
     }
     if (truncated) {
@@ -420,18 +420,23 @@
     }
   }
 
-  function contentAsText(raw) {
-    const text = String(raw || '');
-    if (!looksLikeHTML(text)) return decodeQuotedPrintable(text);
+  function contentAsText(raw, charset = 'utf-8') {
+    const text = decodeQuotedPrintable(raw, charset);
+    if (window.EgMailContent.hasFlattenedDocumentArtifacts(text)) {
+      return window.EgMailContent.cleanFlattenedDocumentText(text, charset);
+    }
+    if (!looksLikeHTML(text)) return text;
     const body = sanitizeEmailDocument(text.length > 300000 ? text.slice(0, 300000) : text);
-    return (body.textContent || '').replace(/\s+/g, ' ').trim() || decodeQuotedPrintable(text.replace(/<[^>]*>/g, ' '));
+    return (body.textContent || '').replace(/\s+/g, ' ').trim() || window.EgMailContent.cleanFlattenedDocumentText(text.replace(/<[^>]*>/g, ' '), charset);
   }
 
   function renderMessageBody(container, message) {
-    const text = contentAsText(message.content || '');
+    const rawContent = window.EgMailContent.getMessageContent(message);
+    const charset = message.charset || 'utf-8';
+    const text = contentAsText(rawContent, charset);
     const otp = window.EgMailOtp.analyze(message, text);
     if (!otp.isOtp) {
-      renderBody(container, message.content || 'No message body was provided.');
+      renderBody(container, rawContent || 'No message body was provided.', charset);
       return;
     }
     container.replaceChildren();
@@ -557,7 +562,8 @@
           from: typeof message.from === 'string' ? window.EgMailOtp.decodeMimeHeader(message.from) : '',
           subject: typeof message.subject === 'string' ? window.EgMailOtp.decodeMimeHeader(message.subject) : '',
           date: typeof message.date === 'string' ? message.date : '',
-          content: typeof message.content === 'string' ? message.content : ''
+          content: window.EgMailContent.getMessageContent(message),
+          charset: window.EgMailContent.getMessageCharset(message)
         }));
         state.stats = payload.stats && typeof payload.stats === 'object' ? payload.stats : null;
         const returnedAddress = normalizeAddress(payload.address || addressAtStart);

@@ -1,15 +1,7 @@
 (() => {
   'use strict';
 
-  function decodeQuotedPrintable(input) {
-    let text = String(input || '').replace(/=\r?\n/g, '');
-    text = text.replace(/(?:=[0-9a-f]{2})+/gi, (sequence) => {
-      const bytes = sequence.match(/=[0-9a-f]{2}/gi).map((part) => parseInt(part.slice(1), 16));
-      try { return new TextDecoder('utf-8', { fatal: false }).decode(new Uint8Array(bytes)); }
-      catch (_) { return bytes.map((byte) => String.fromCharCode(byte)).join(''); }
-    });
-    return text.replace(/\b039;/g, "'");
-  }
+  const decodeQuotedPrintable = window.EgMailContent.decodeQuotedPrintable;
 
   function decodeMimeHeader(input) {
     return String(input || '').replace(/=\?([^?]+)\?([bq])\?([^?]*)\?=/gi, (whole, charset, encoding, data) => {
