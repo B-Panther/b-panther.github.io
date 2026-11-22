@@ -16,6 +16,7 @@
     addressForm: $('#addressForm'), prefixInput: $('#prefixInput'), domainSelect: $('#domainSelect'), domainField: $('#domainField'),
     randomButton: $('#randomButton'), openButton: $('#openButton'), activeAddress: $('#activeAddress'), inboxState: $('#inboxState'),
     copyAddressButton: $('#copyAddressButton'), saveAddressButton: $('#saveAddressButton'), savedList: $('#savedList'), savedCount: $('#savedCount'),
+    savedHeadingLabel: $('#savedHeadingLabel'), savedStorageNote: $('#savedStorageNote'),
     exportButton: $('#exportButton'), importButton: $('#importButton'), importFile: $('#importFile'), messageCount: $('#messageCount'),
     updatedLabel: $('#updatedLabel'), refreshButton: $('#refreshButton'), autoRefreshToggle: $('#autoRefreshToggle'),
     searchInput: $('#searchInput'), sortSelect: $('#sortSelect'), messageList: $('#messageList'), listSummary: $('#listSummary'),
@@ -28,7 +29,7 @@
 
   const state = {
     address: '', messages: [], stats: null, selectedKey: '', lastFetchedAt: null,
-    busy: false, abortController: null, refreshTimer: null, toastTimer: null, searchTimer: null
+    busy: false, abortController: null, refreshTimer: null, toastTimer: null, searchTimer: null, settingsTimer: null
   };
 
   function readSaved() {
@@ -174,7 +175,10 @@
   }
 
   function updateSaveButton() {
-    const isSaved = Boolean(state.address && readSaved().includes(state.address));
+    const account = window.EgMailAccount;
+    const isSaved = Boolean(state.address && (account.isAuthenticated()
+      ? account.getAddresses().some((entry) => entry.address === state.address)
+      : readSaved().includes(state.address)));
     const label = els.saveAddressButton.querySelector('span');
     if (label) label.textContent = isSaved ? 'Saved' : 'Save';
     els.saveAddressButton.classList.toggle('is-saved', isSaved);
@@ -183,7 +187,15 @@
   }
 
   function renderSaved() {
-    const saved = readSaved();
+    const account = window.EgMailAccount;
+    const isSynced = account.isAuthenticated();
+    const saved = isSynced
+      ? account.getAddresses()
+      : readSaved().map((address) => ({ id: '', address, label: '', isFavorite: false }));
+    els.savedHeadingLabel.textContent = isSynced ? 'SAVED TO ACCOUNT' : 'SAVED ON THIS DEVICE';
+    els.savedStorageNote.textContent = isSynced
+      ? 'Saved addresses sync across browsers. Inbox contents remain public.'
+      : 'Sign in to sync saved addresses between browsers. Inbox contents remain public.';
     els.savedCount.textContent = String(saved.length);
     els.exportButton.disabled = saved.length === 0;
     els.savedList.replaceChildren();
@@ -194,9 +206,10 @@
       els.savedList.append(empty);
       return;
     }
-    saved.forEach((address) => {
+    saved.forEach((entry) => {
+      const address = entry.address;
       const item = document.createElement('li');
-      item.className = 'saved-item';
+      item.className = `saved-item${entry.isFavorite ? ' is-favorite' : ''}`;
       const open = document.createElement('button');
       open.type = 'button';
       open.className = 'saved-open';
@@ -204,19 +217,37 @@
       const full = document.createElement('strong');
       full.textContent = address;
       const detail = document.createElement('span');
-      detail.textContent = address === state.address ? 'Currently open' : 'Reopen inbox';
+      detail.textContent = entry.label || (address === state.address ? 'Currently open' : 'Reopen inbox');
       open.append(full, detail);
       open.addEventListener('click', () => openInbox(address));
+      const favorite = document.createElement('button');
+      favorite.type = 'button';
+      favorite.className = `saved-star${entry.isFavorite ? ' is-favorite' : ''}`;
+      favorite.textContent = entry.isFavorite ? '★' : '☆';
+      favorite.title = entry.isFavorite ? 'Remove favorite' : 'Mark as favorite';
+      favorite.setAttribute('aria-label', `${entry.isFavorite ? 'Unfavorite' : 'Favorite'} ${address}`);
+      favorite.addEventListener('click', async () => {
+        if (!isSynced) return;
+        try { await account.updateAddress({ ...entry, isFavorite: !entry.isFavorite }); }
+        catch (_) { showToast('Favorite setting could not be saved.'); }
+      });
       const remove = document.createElement('button');
       remove.type = 'button';
       remove.className = 'saved-remove';
       remove.textContent = '×';
       remove.setAttribute('aria-label', `Remove ${address} from saved addresses`);
-      remove.addEventListener('click', () => {
-        writeSaved(readSaved().filter((savedAddress) => savedAddress !== address));
-        showToast('Address removed from this device.');
+      remove.addEventListener('click', async () => {
+        try {
+          if (isSynced) {
+            await account.removeAddress(entry.id);
+            showToast('Address removed from your account.');
+          } else {
+            writeSaved(readSaved().filter((savedAddress) => savedAddress !== address));
+            showToast('Address removed from this device.');
+          }
+        } catch (_) { showToast('Saved address could not be removed.'); }
       });
-      item.append(open, remove);
+      item.append(open, favorite, remove);
       els.savedList.append(item);
     });
   }
@@ -272,7 +303,10 @@
       subject.textContent = message.subject || '(no subject)';
       const preview = document.createElement('span');
       preview.className = 'message-preview';
-      preview.textContent = contentAsText(message.content || '').replace(/\s+/g, ' ').trim().slice(0, 115) || 'No preview available';
+      const messageText = contentAsText(message.content || '');
+      const otp = window.EgMailOtp.analyze(message, messageText);
+      preview.textContent = otp.isOtp ? `${otp.provider} verification message` : messageText.replace(/\s+/g, ' ').trim().slice(0, 115) || 'No preview available';
+      preview.classList.toggle('otp-list-preview', otp.isOtp);
       main.append(from, subject, preview);
       const time = document.createElement('time');
       time.className = 'message-time';
@@ -308,7 +342,7 @@
     els.detailFrom.textContent = message.from || 'Unknown sender';
     els.detailDate.textContent = prettyDate(message.date, false);
     els.senderAvatar.textContent = initials(message.from || '?');
-    renderBody(els.messageBody, message.content || 'No message body was provided.');
+    renderMessageBody(els.messageBody, message);
     els.messageLayout.classList.add('mobile-detail');
     renderMessages();
   }
@@ -393,12 +427,85 @@
     return (body.textContent || '').replace(/\s+/g, ' ').trim() || decodeQuotedPrintable(text.replace(/<[^>]*>/g, ' '));
   }
 
+  function renderMessageBody(container, message) {
+    const text = contentAsText(message.content || '');
+    const otp = window.EgMailOtp.analyze(message, text);
+    if (!otp.isOtp) {
+      renderBody(container, message.content || 'No message body was provided.');
+      return;
+    }
+    container.replaceChildren();
+    const card = document.createElement('section');
+    card.className = 'otp-card';
+    const header = document.createElement('div');
+    header.className = 'otp-card-head';
+    const badge = document.createElement('span');
+    badge.className = 'otp-badge';
+    badge.textContent = otp.provider;
+    const context = document.createElement('span');
+    context.className = 'otp-context';
+    context.textContent = 'Verification message';
+    header.append(badge, context);
+    card.append(header);
+    if (otp.code) {
+      const caption = document.createElement('span');
+      caption.className = 'otp-caption';
+      caption.textContent = 'Detected code';
+      const row = document.createElement('div');
+      row.className = 'otp-code-row';
+      const code = document.createElement('strong');
+      code.className = 'otp-code';
+      code.textContent = otp.code;
+      const copy = document.createElement('button');
+      copy.type = 'button';
+      copy.className = 'otp-copy-button';
+      copy.setAttribute('aria-label', 'Copy verification code');
+      copy.innerHTML = '<svg viewBox="0 0 20 20" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="2"/><path d="M13 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/></svg><span>Copy</span>';
+      copy.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(otp.code);
+          showToast('Verification code copied.');
+        } catch (_) {
+          const temporary = document.createElement('textarea');
+          temporary.value = otp.code;
+          temporary.setAttribute('readonly', '');
+          temporary.style.position = 'fixed';
+          temporary.style.opacity = '0';
+          document.body.append(temporary);
+          temporary.select();
+          const copied = document.execCommand('copy');
+          temporary.remove();
+          showToast(copied ? 'Verification code copied.' : 'Copy was blocked by this browser.');
+        }
+      });
+      row.append(code, copy);
+      card.append(caption, row);
+    } else {
+      const note = document.createElement('p');
+      note.className = 'otp-no-code';
+      note.textContent = otp.ambiguous
+        ? 'More than one possible code was found, so no code is shown.'
+        : 'A single code could not be identified confidently, so the message text is hidden.';
+      card.append(note);
+    }
+    const privacyNote = document.createElement('span');
+    privacyNote.className = 'otp-caption';
+    privacyNote.textContent = 'Other email text and unrelated numbers are not shown.';
+    card.append(privacyNote);
+    container.append(card);
+  }
+
   async function openInbox(address, options = {}) {
     const normalized = normalizeAddress(address);
     if (!normalized) {
       showToast('Use a prefix with one of the three supported domains.');
       return;
     }
+    try {
+      if (window.location.pathname !== `/${normalized}` || window.location.search || window.location.hash) {
+        window.history.replaceState(null, '', `/${normalized}`);
+      }
+    } catch (_) { /* browser may restrict history updates */ }
     if (state.abortController) state.abortController.abort();
     state.abortController = null;
     state.busy = false;
@@ -422,6 +529,9 @@
     setStatus('Connecting to inbox service…');
     els.updatedLabel.textContent = 'Loading messages…';
     try { localStorage.setItem(STORAGE.active, normalized); } catch (_) { /* local storage may be blocked */ }
+    if (window.EgMailAccount.isAuthenticated()) {
+      window.EgMailAccount.saveAddress(normalized).catch(() => showToast('This inbox could not be synced to your account yet.'));
+    }
     await fetchInbox(options.quiet === true);
     startAutoRefresh();
   }
@@ -444,8 +554,8 @@
       if (addressAtStart !== state.address) return;
       if (payload && typeof payload === 'object' && Array.isArray(payload.received_emails)) {
         state.messages = payload.received_emails.filter((message) => message && typeof message === 'object').map((message) => ({
-          from: typeof message.from === 'string' ? message.from : '',
-          subject: typeof message.subject === 'string' ? message.subject : '',
+          from: typeof message.from === 'string' ? window.EgMailOtp.decodeMimeHeader(message.from) : '',
+          subject: typeof message.subject === 'string' ? window.EgMailOtp.decodeMimeHeader(message.subject) : '',
           date: typeof message.date === 'string' ? message.date : '',
           content: typeof message.content === 'string' ? message.content : ''
         }));
@@ -455,6 +565,9 @@
           state.address = returnedAddress;
           try { localStorage.setItem(STORAGE.active, returnedAddress); } catch (_) { /* optional */ }
           updateAddressUI();
+          if (window.EgMailAccount.isAuthenticated()) {
+            window.EgMailAccount.saveAddress(returnedAddress).catch(() => showToast('This inbox could not be synced to your account yet.'));
+          }
         }
         state.lastFetchedAt = new Date();
         const total = state.messages.length;
@@ -504,10 +617,10 @@
 
   function openPrivacy() {
     if (typeof els.privacyDialog.showModal === 'function') els.privacyDialog.showModal();
-    else alert('Public inboxes are readable by anyone who knows the address. Saved addresses stay only in this browser; there is no account or cross-browser sync.');
+    else alert('Public inboxes are readable by anyone who knows the address. Saved addresses stay in this browser unless you sign in to sync them. Account sync does not make inboxes private.');
   }
 
-  function updateTheme(theme) {
+  function updateTheme(theme, sync = true) {
     const next = theme === 'light' ? 'light' : 'dark';
     document.documentElement.dataset.theme = next;
     try { localStorage.setItem(STORAGE.theme, next); } catch (_) { /* optional */ }
@@ -516,10 +629,35 @@
     els.themeToggle.innerHTML = next === 'dark'
       ? '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"/></svg>'
       : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.2 15.3A8.5 8.5 0 0 1 8.7 3.8 8.5 8.5 0 1 0 20.2 15.3Z"/></svg>';
+    if (sync) scheduleSettingsSync();
   }
 
-  function toggleSavedAddress() {
+  function scheduleSettingsSync() {
+    if (!window.EgMailAccount.isAuthenticated()) return;
+    clearTimeout(state.settingsTimer);
+    state.settingsTimer = setTimeout(() => {
+      window.EgMailAccount.saveSettings({
+        theme: document.documentElement.dataset.theme === 'light' ? 'light' : 'dark',
+        autoRefresh: els.autoRefreshToggle.checked
+      }).catch(() => showToast('Account preferences could not be synced yet.'));
+    }, 400);
+  }
+
+  async function toggleSavedAddress() {
     if (!state.address) return;
+    if (window.EgMailAccount.isAuthenticated()) {
+      const existing = window.EgMailAccount.getAddresses().find((entry) => entry.address === state.address);
+      try {
+        if (existing) {
+          await window.EgMailAccount.removeAddress(existing.id);
+          showToast('Address removed from your account.');
+        } else {
+          await window.EgMailAccount.saveAddress(state.address);
+          showToast('Address saved to your account.');
+        }
+      } catch (_) { showToast('Account address could not be updated.'); }
+      return;
+    }
     const saved = readSaved();
     if (saved.includes(state.address)) {
       writeSaved(saved.filter((address) => address !== state.address));
@@ -550,7 +688,9 @@
   }
 
   function exportAddresses() {
-    const saved = readSaved();
+    const saved = window.EgMailAccount.isAuthenticated()
+      ? window.EgMailAccount.getAddresses().map((entry) => entry.address)
+      : readSaved();
     if (!saved.length) return;
     const blob = new Blob([JSON.stringify({ app: 'EgMail', schemaVersion: 1, exportedAt: new Date().toISOString(), addresses: saved }, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -573,8 +713,13 @@
       const values = Array.isArray(parsed) ? parsed : parsed && Array.isArray(parsed.addresses) ? parsed.addresses : [];
       const valid = values.map(normalizeAddress).filter(Boolean);
       if (!valid.length) throw new Error('No supported addresses were found.');
-      writeSaved([...valid, ...readSaved()]);
-      showToast(`${new Set(valid).size} address(es) imported to this browser.`);
+      if (window.EgMailAccount.isAuthenticated()) {
+        await Promise.all([...new Set(valid)].map((address) => window.EgMailAccount.saveAddress(address)));
+        showToast(`${new Set(valid).size} address(es) imported to your account.`);
+      } else {
+        writeSaved([...valid, ...readSaved()]);
+        showToast(`${new Set(valid).size} address(es) imported to this browser.`);
+      }
     } catch (_) {
       showToast('That backup could not be read. Choose an EgMail JSON backup.');
     } finally {
@@ -618,6 +763,7 @@
   els.autoRefreshToggle.addEventListener('change', () => {
     try { localStorage.setItem(STORAGE.autoRefresh, els.autoRefreshToggle.checked ? 'true' : 'false'); } catch (_) { /* optional */ }
     startAutoRefresh();
+    scheduleSettingsSync();
     showToast(els.autoRefreshToggle.checked ? 'Auto refresh is on (every 30 seconds).' : 'Auto refresh is off.');
   });
   els.searchInput.addEventListener('input', () => {
@@ -645,14 +791,37 @@
 
   try {
     const savedTheme = localStorage.getItem(STORAGE.theme);
-    updateTheme(savedTheme || (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'));
+    updateTheme(savedTheme || (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'), false);
     els.autoRefreshToggle.checked = localStorage.getItem(STORAGE.autoRefresh) === 'true';
   } catch (_) { updateTheme('dark'); }
   renderSaved();
   updateAddressUI();
   renderMessages();
-  const initialAddress = normalizeAddress(new URLSearchParams(window.location.search).get('address') || (() => {
+  const pathSegment = window.location.pathname.replace(/^\/+/, '').replace(/\/+$/, '');
+  let pathAddress = '';
+  try { pathAddress = decodeURIComponent(pathSegment); } catch (_) { /* invalid encoded path */ }
+  const initialAddress = normalizeAddress(new URLSearchParams(window.location.search).get('address') || pathAddress || (() => {
     try { return localStorage.getItem(STORAGE.active) || ''; } catch (_) { return ''; }
   })());
-  if (initialAddress) openInbox(initialAddress);
+  window.EgMailAccount.setChangeHandler(async ({ authenticated, justAuthenticated, settings }) => {
+    if (authenticated) {
+      if (justAuthenticated) {
+        const candidates = new Set([...readSaved(), ...(state.address ? [state.address] : [])]);
+        for (const address of candidates) {
+          try { await window.EgMailAccount.saveAddress(address); }
+          catch (_) { showToast('Some local addresses could not be synced.'); break; }
+        }
+      }
+      if (settings && ['dark', 'light'].includes(settings.theme)) updateTheme(settings.theme, false);
+      if (settings && typeof settings.autoRefresh === 'boolean') {
+        els.autoRefreshToggle.checked = settings.autoRefresh;
+        startAutoRefresh();
+      }
+    }
+    renderSaved();
+    updateSaveButton();
+  });
+  window.EgMailAccount.init().finally(() => {
+    if (initialAddress) openInbox(initialAddress);
+  });
 })();
