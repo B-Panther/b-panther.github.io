@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#101626">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="egmail-api-origin" content="https://egmailauth-27vxmcwy.manus.space">
+  <meta name="description" content="Sign in to sync your saved EgMail inbox addresses and preferences.">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/account-pages.css">
+  <title>Sign in · EgMail</title>
+</head>
+<body class="account-page-body" data-account-mode="login">
+  <a class="skip-link" href="#loginForm">Skip to sign in</a>
+  <div class="account-page-shell">
+    <header class="account-page-header">
+      <a class="brand" href="/" aria-label="EgMail home">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 40 40" fill="none"><rect x="3" y="5" width="34" height="30" rx="10" fill="currentColor" opacity=".16"/><path d="M9 13.5 20 22l11-8.5M10 12h20a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2V14a2 2 0 0 1 2-2Z" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="31" cy="9" r="3" fill="#B8F36A"/></svg>
+        </span>
+        <span class="brand-copy"><strong>egmail</strong><small>DISPOSABLE INBOX</small></span>
+      </a>
+      <a class="account-page-back" href="/">Back to inbox</a>
+    </header>
+
+    <main class="account-page-main">
+      <section class="account-story" aria-labelledby="storyTitle">
+        <div class="eyebrow"><span class="eyebrow-line"></span> EGMAIL ACCOUNT</div>
+        <h1 id="storyTitle">Your inbox list,<br><span>wherever you sign in.</span></h1>
+        <p>Sign in to see your saved inbox addresses and supported preferences on another browser.</p>
+        <div class="account-benefits" aria-label="Account benefits">
+          <div class="account-benefit"><span class="benefit-mark" aria-hidden="true">✓</span><span><strong>Saved addresses sync</strong><small>Pick up your address list on another browser.</small></span></div>
+          <div class="account-benefit"><span class="benefit-mark" aria-hidden="true">✓</span><span><strong>Your choices follow you</strong><small>Theme and auto-refresh preferences can sync.</small></span></div>
+        </div>
+        <div class="account-page-warning"><strong>Inbox privacy stays the same.</strong> Mailboxes are public by address. Signing in does not make messages private.</div>
+      </section>
+
+      <section class="account-page-card" aria-labelledby="accountHeading">
+        <div class="account-card-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M12 3 20 6v5c0 5.1-3.4 8.5-8 10-4.6-1.5-8-4.9-8-10V6l8-3Z"/><path d="M8 12h8M12 8v8"/></svg>
+        </div>
+        <span class="section-kicker">ACCOUNT ACCESS</span>
+        <h2 id="accountHeading">Welcome back</h2>
+        <p class="account-page-lead">Use your phone number or username and password.</p>
+
+        <form id="loginForm" class="account-page-form" autocomplete="on" method="post">
+          <label for="loginIdentifier">Phone number or username</label>
+          <input id="loginIdentifier" name="identifier" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="64" placeholder="+country code or username" required>
+          <label for="loginPassword">Password</label>
+          <input id="loginPassword" name="password" type="password" autocomplete="current-password" maxlength="128" required>
+          <button class="primary-button account-page-submit" type="submit" disabled>Sign in</button>
+        </form>
+        <p class="account-page-message" id="accountPageMessage" role="status" aria-live="polite"></p>
+        <div class="already-signed-in" id="alreadySignedIn" hidden>
+          <strong>You’re already signed in.</strong>
+          <span>Continue to your inbox and account settings.</span>
+          <a class="primary-button account-page-submit" id="continueLink" href="/">Continue to EgMail</a>
+        </div>
+        <p class="account-page-switch">New to EgMail? <a id="otherAccountPageLink" href="/create-account.html">Create an account</a></p>
+        <p class="account-page-note">Account sync stores saved addresses and preferences only. Inbox messages remain public and are not stored in your account.</p>
+      </section>
+    </main>
+
+    <footer class="account-page-footer"><span>EgMail account access</span><a href="/">Return to the public inbox</a></footer>
+  </div>
+  <script src="/account-page.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#101626">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="egmail-api-origin" content="https://egmailauth-27vxmcwy.manus.space">
+  <meta name="description" content="Create an EgMail account to sync saved inbox addresses and preferences.">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/account-pages.css">
+  <title>Create account · EgMail</title>
+</head>
+<body class="account-page-body" data-account-mode="register">
+  <a class="skip-link" href="#registerForm">Skip to account creation</a>
+  <div class="account-page-shell">
+    <header class="account-page-header">
+      <a class="brand" href="/" aria-label="EgMail home">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 40 40" fill="none"><rect x="3" y="5" width="34" height="30" rx="10" fill="currentColor" opacity=".16"/><path d="M9 13.5 20 22l11-8.5M10 12h20a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2V14a2 2 0 0 1 2-2Z" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="31" cy="9" r="3" fill="#B8F36A"/></svg>
+        </span>
+        <span class="brand-copy"><strong>egmail</strong><small>DISPOSABLE INBOX</small></span>
+      </a>
+      <a class="account-page-back" href="/">Back to inbox</a>
+    </header>
+
+    <main class="account-page-main account-page-main-register">
+      <section class="account-story" aria-labelledby="storyTitle">
+        <div class="eyebrow"><span class="eyebrow-line"></span> A MORE PORTABLE INBOX LIST</div>
+        <h1 id="storyTitle">Create your<br><span>EgMail account.</span></h1>
+        <p>Keep saved inbox addresses and supported preferences with your account when you switch browsers.</p>
+        <div class="account-benefits" aria-label="Account details">
+          <div class="account-benefit"><span class="benefit-mark" aria-hidden="true">✓</span><span><strong>No SMS code</strong><small>Your phone number is not verified and no message is sent.</small></span></div>
+          <div class="account-benefit"><span class="benefit-mark" aria-hidden="true">✓</span><span><strong>Messages are not stored</strong><small>Your account keeps addresses and settings, not inbox contents.</small></span></div>
+        </div>
+        <div class="account-page-warning"><strong>Public inbox reminder.</strong> Anyone who knows a disposable address may be able to read its messages. Account login does not make an inbox private.</div>
+      </section>
+
+      <section class="account-page-card account-page-card-register" aria-labelledby="accountHeading">
+        <div class="account-card-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M12 3 20 6v5c0 5.1-3.4 8.5-8 10-4.6-1.5-8-4.9-8-10V6l8-3Z"/><path d="M8 12h8M12 8v8"/></svg>
+        </div>
+        <span class="section-kicker">CREATE ACCOUNT</span>
+        <h2 id="accountHeading">Start with the basics</h2>
+        <p class="account-page-lead">Choose a phone sign-in identifier, username and strong password.</p>
+
+        <form id="registerForm" class="account-page-form" autocomplete="on" method="post">
+          <label for="registerPhone">Phone number with country code</label>
+          <input id="registerPhone" name="tel" type="tel" autocomplete="tel" inputmode="tel" maxlength="24" placeholder="+92 300 1234567" required>
+          <label for="registerUsername">Username</label>
+          <input id="registerUsername" name="username" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" minlength="3" maxlength="32" pattern="[a-zA-Z0-9][a-zA-Z0-9._-]{2,31}" placeholder="yourname" required>
+          <label for="registerPassword">Password <span class="label-hint">12–128 characters</span></label>
+          <input id="registerPassword" name="new-password" type="password" autocomplete="new-password" minlength="12" maxlength="128" required>
+          <label for="registerPasswordConfirm">Confirm password</label>
+          <input id="registerPasswordConfirm" name="confirm-password" type="password" autocomplete="new-password" minlength="12" maxlength="128" required>
+          <div class="account-page-security-note"><strong>No SMS is sent.</strong> Your number is unverified and cannot prove ownership for password recovery. Keep your password safe.</div>
+          <button class="primary-button account-page-submit" type="submit" disabled>Create account</button>
+        </form>
+        <p class="account-page-message" id="accountPageMessage" role="status" aria-live="polite"></p>
+        <div class="already-signed-in" id="alreadySignedIn" hidden>
+          <strong>You’re already signed in.</strong>
+          <span>Continue to your inbox and account settings.</span>
+          <a class="primary-button account-page-submit" id="continueLink" href="/">Continue to EgMail</a>
+        </div>
+        <p class="account-page-switch">Already have an account? <a id="otherAccountPageLink" href="/login.html">Sign in</a></p>
+        <p class="account-page-note">Use EgMail only for non-sensitive services. Public inboxes are not private email accounts.</p>
+      </section>
+    </main>
+
+    <footer class="account-page-footer"><span>EgMail account access</span><a href="/">Return to the public inbox</a></footer>
+  </div>
+  <script src="/account-page.js" defer></script>
+</body>
+</html>

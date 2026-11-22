@@ -126,8 +126,16 @@
   }
 
   function openDialog() {
-    if (state.authenticated) renderView();
-    else setMode('login');
+    if (!state.authenticated) {
+      const currentRoute = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+      const loginUrl = new URL('/login.html', window.location.origin);
+      if (!['/login.html', '/create-account.html'].includes(window.location.pathname)) {
+        loginUrl.searchParams.set('returnTo', currentRoute);
+      }
+      window.location.assign(`${loginUrl.pathname}${loginUrl.search}`);
+      return;
+    }
+    renderView();
     if (typeof els.dialog.showModal === 'function') els.dialog.showModal();
     else els.dialog.setAttribute('open', '');
   }

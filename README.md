@@ -14,6 +14,8 @@ Email bodies are rendered with a safe allow-list. Scripts, forms, embedded media
 
 GitHub Pages is static and cannot run Express or MySQL. Account sign-up/sign-in, saved inbox synchronization, and synchronized settings use the separate public account backend at `https://egmailauth-27vxmcwy.manus.space`. The account API origin is configured in the frontend's `<meta name="egmail-api-origin">` and can be changed without editing the account client.
 
+Signed-out visitors use the dedicated `/login.html` and `/create-account.html` pages. The home-page account button routes to sign-in; successful authentication returns to a validated same-site `returnTo` path. Registration uses a phone number, username and password without SMS: phone numbers are unverified and cannot prove ownership for recovery.
+
 The backend accepts credentialed CORS only from `https://www.egmail.me`, `https://egmail.me`, and `https://b-panther.github.io`. Account requests include cookies and CSRF headers. Production cookies use `Secure; SameSite=None; Partitioned` for cross-site API requests. Partitioned-cookie support and privacy settings vary by browser; if a browser blocks those cookies, account sessions may not persist from Pages. A same-site account API hostname would require supported custom-domain binding and an explicitly approved DNS change.
 
 The mailbox API is public and address-based. Anyone who knows an address may be able to request its messages, including verification emails. Linking an address to an account synchronizes the address and preferences only; it does **not** make the inbox private or restrict API access. Do not use these inboxes for banking, account recovery, sensitive accounts, or private correspondence. Message bodies are not stored by the account backend.
