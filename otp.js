@@ -38,25 +38,38 @@
     const subject = decodeMimeHeader(message && message.subject);
     const body = decodeQuotedPrintable(bodyText);
     const source = `${from}\n${subject}\n${body}`.slice(0, 300000);
+    
+    // Subject se code nikalne ki koshish (e.g., "Use 765477 to get back...")
+    const subjectMatch = subject.match(/\b([0-9]{4,8})\b/);
+    const subjectCode = subjectMatch ? subjectMatch[1] : null;
+
     const codes = collectCodes(source);
     const hasCodeWord = /\b(?:code|otp|passcode)\b/i.test(source);
-    const hasVerificationIntent = /\b(?:verification|verify|security|confirmation|confirm|login|sign[ -]?in|authentication|authenticate|one[ -]?time|otp|passcode)\b/i.test(source);
+    const hasVerificationIntent = /\b(?:verification|verify|security|confirmation|confirm|login|sign[ -]?in|authentication|authenticate|one[ -]?time|otp|passcode|get back into|recovery)\b/i.test(source);
     const hasProviderCodePhrase = /\b(?:facebook|meta|fb)\s+(?:(?:security|verification|confirmation|login|sign[ -]?in|one[ -]?time)\s+)?(?:code|passcode|otp)\b/i.test(source);
-    const isOtp = hasCodeWord && (hasVerificationIntent || hasProviderCodePhrase);
+    const isOtp = (hasCodeWord && (hasVerificationIntent || hasProviderCodePhrase)) || Boolean(subjectCode);
     const facebook = /\bfacebook\b|facebookmail\.com|\bmeta\b/i.test(`${from}\n${subject}\n${body.slice(0, 8000)}`);
-    const recoveryIntent = /\b(?:get back into (?:your|the) account|account recovery|recover(?:y|ing)? (?:your|the) account|password recovery|reset (?:your )?(?:password|account)|restore access to (?:your|the) account)\b/i.test(`${subject}\n${body.slice(0, 12000)}`);
     
-    // PROTECTION DISABLED: Ab koi code hide nahi hoga
-    const protectedMessage = false; 
+    const protectedMessage = false;
     
+    // Logic: Agar 1 code hai to wo do, agar multiple hain lekin subject me 1 hai to subject wala do
+    let finalCode = '';
+    if (isOtp && !protectedMessage) {
+      if (codes.length === 1) {
+        finalCode = codes[0];
+      } else if (subjectCode) {
+        finalCode = subjectCode;
+      }
+    }
+
     return {
       isOtp: isOtp || protectedMessage,
       provider: facebook ? 'Facebook' : 'Verification',
-      code: isOtp && codes.length === 1 && !protectedMessage ? codes[0] : '',
-      ambiguous: isOtp && codes.length > 1,
+      code: finalCode,
+      ambiguous: isOtp && !finalCode && codes.length > 1, // Only ambiguous if we truly couldn't pick one
       protectedMessage,
-      recoveryIntent,
-      displaySubject: protectedMessage ? subject.replace(/\d+/g, '[hidden]') : subject
+      recoveryIntent: false,
+      displaySubject: subject
     };
   }
 
