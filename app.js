@@ -305,8 +305,11 @@
       preview.className = 'message-preview';
       const messageText = contentAsText(message.content || '', message.charset);
       const otp = window.EgMailOtp.analyze(message, messageText);
-      preview.textContent = otp.isOtp ? `${otp.provider} verification message` : messageText.replace(/\s+/g, ' ').trim().slice(0, 115) || 'No preview available';
-      preview.classList.toggle('otp-list-preview', otp.isOtp);
+      const protectedMessage = message.protectedMessage || otp.protectedMessage;
+      preview.textContent = protectedMessage
+        ? `${otp.provider} security message — code hidden`
+        : otp.isOtp ? `${otp.provider} verification message` : messageText.replace(/\s+/g, ' ').trim().slice(0, 115) || 'No preview available';
+      preview.classList.toggle('otp-list-preview', otp.isOtp || protectedMessage);
       main.append(from, subject, preview);
       const time = document.createElement('time');
       time.className = 'message-time';
@@ -437,6 +440,28 @@
     const charset = message.charset || 'utf-8';
     const text = contentAsText(rawContent, charset);
     const otp = window.EgMailOtp.analyze(message, text);
+    if (message.protectedMessage || otp.protectedMessage) {
+      container.replaceChildren();
+      const card = document.createElement('section');
+      card.className = 'otp-card';
+      const header = document.createElement('div');
+      header.className = 'otp-card-head';
+      const badge = document.createElement('span');
+      badge.className = 'otp-badge';
+      badge.textContent = otp.provider;
+      const context = document.createElement('span');
+      context.className = 'otp-context';
+      context.textContent = otp.recoveryIntent ? 'Account recovery notice' : 'Security code hidden';
+      header.append(badge, context);
+      const warning = document.createElement('p');
+      warning.className = 'otp-no-code';
+      warning.textContent = otp.recoveryIntent
+        ? 'Recovery codes are hidden on this page, but this public mailbox service may still expose the original email. Use a private, verified email address to recover your account.'
+        : 'Meta/Facebook security codes are hidden on this page, but this public mailbox service may still expose the original email. Use a private, verified email address for account access.';
+      card.append(header, warning);
+      container.append(card);
+      return;
+    }
     if (!otp.isOtp) {
       renderBody(container, rawContent || 'No message body was provided.', charset);
       return;
@@ -560,13 +585,20 @@
       const payload = await response.json();
       if (addressAtStart !== state.address) return;
       if (payload && typeof payload === 'object' && Array.isArray(payload.received_emails)) {
-        state.messages = payload.received_emails.filter((message) => message && typeof message === 'object').map((message) => ({
-          from: typeof message.from === 'string' ? window.EgMailOtp.decodeMimeHeader(message.from) : '',
-          subject: typeof message.subject === 'string' ? window.EgMailOtp.decodeMimeHeader(message.subject) : '',
-          date: typeof message.date === 'string' ? message.date : '',
-          content: window.EgMailContent.getMessageContent(message),
-          charset: window.EgMailContent.getMessageCharset(message)
-        }));
+        state.messages = payload.received_emails.filter((message) => message && typeof message === 'object').map((message) => {
+          const normalized = {
+            from: typeof message.from === 'string' ? window.EgMailOtp.decodeMimeHeader(message.from) : '',
+            subject: typeof message.subject === 'string' ? window.EgMailOtp.decodeMimeHeader(message.subject) : '',
+            date: typeof message.date === 'string' ? message.date : '',
+            content: window.EgMailContent.getMessageContent(message),
+            charset: window.EgMailContent.getMessageCharset(message)
+          };
+          const bodyText = contentAsText(normalized.content, normalized.charset);
+          const analysis = window.EgMailOtp.analyze(normalized, bodyText);
+          normalized.protectedMessage = analysis.protectedMessage;
+          if (analysis.protectedMessage) normalized.subject = analysis.displaySubject;
+          return normalized;
+        });
         state.stats = payload.stats && typeof payload.stats === 'object' ? payload.stats : null;
         const returnedAddress = normalizeAddress(payload.address || addressAtStart);
         if (returnedAddress && returnedAddress !== addressAtStart) {

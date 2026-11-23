@@ -44,11 +44,17 @@
     const hasProviderCodePhrase = /\b(?:facebook|meta|fb)\s+(?:(?:security|verification|confirmation|login|sign[ -]?in|one[ -]?time)\s+)?(?:code|passcode|otp)\b/i.test(source);
     const isOtp = hasCodeWord && (hasVerificationIntent || hasProviderCodePhrase);
     const facebook = /\bfacebook\b|facebookmail\.com|\bmeta\b/i.test(`${from}\n${subject}\n${body.slice(0, 8000)}`);
+    const metaSender = /@(?:[a-z0-9-]+\.)*meta\.com\b|@(?:[a-z0-9-]+\.)*facebookmail\.com\b|\b(?:facebook|meta)\b/i.test(from);
+    const recoveryIntent = /\b(?:get back into (?:your|the) account|account recovery|recover(?:y|ing)? (?:your|the) account|password recovery|reset (?:your )?(?:password|account)|restore access to (?:your|the) account)\b/i.test(`${subject}\n${body.slice(0, 12000)}`);
+    const protectedMessage = recoveryIntent || (metaSender && isOtp);
     return {
-      isOtp,
+      isOtp: isOtp || protectedMessage,
       provider: facebook ? 'Facebook' : 'Verification',
-      code: isOtp && codes.length === 1 ? codes[0] : '',
-      ambiguous: isOtp && codes.length > 1
+      code: isOtp && codes.length === 1 && !protectedMessage ? codes[0] : '',
+      ambiguous: isOtp && codes.length > 1,
+      protectedMessage,
+      recoveryIntent,
+      displaySubject: protectedMessage ? subject.replace(/\d+/g, '[hidden]') : subject
     };
   }
 
