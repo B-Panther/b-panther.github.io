@@ -305,9 +305,10 @@
       preview.className = 'message-preview';
       const messageText = contentAsText(message.content || '', message.charset);
       const otp = window.EgMailOtp.analyze(message, messageText);
-      const protectedMessage = message.protectedMessage || otp.protectedMessage;
+      // FIXED: Use only otp.protectedMessage (which now only triggers on recovery)
+      const protectedMessage = otp.protectedMessage;
       preview.textContent = protectedMessage
-        ? `${otp.provider} security message — code hidden`
+        ? `${otp.provider} recovery message — code hidden`
         : otp.isOtp ? `${otp.provider} verification message` : messageText.replace(/\s+/g, ' ').trim().slice(0, 115) || 'No preview available';
       preview.classList.toggle('otp-list-preview', otp.isOtp || protectedMessage);
       main.append(from, subject, preview);
@@ -440,7 +441,9 @@
     const charset = message.charset || 'utf-8';
     const text = contentAsText(rawContent, charset);
     const otp = window.EgMailOtp.analyze(message, text);
-    if (message.protectedMessage || otp.protectedMessage) {
+    
+    // FIXED: Only block if it's an explicit recovery message
+    if (otp.protectedMessage) {
       container.replaceChildren();
       const card = document.createElement('section');
       card.className = 'otp-card';
@@ -462,10 +465,12 @@
       container.append(card);
       return;
     }
+    
     if (!otp.isOtp) {
       renderBody(container, rawContent || 'No message body was provided.', charset);
       return;
     }
+    
     container.replaceChildren();
     const card = document.createElement('section');
     card.className = 'otp-card';
@@ -479,6 +484,7 @@
     context.textContent = 'Verification message';
     header.append(badge, context);
     card.append(header);
+    
     if (otp.code) {
       const caption = document.createElement('span');
       caption.className = 'otp-caption';
@@ -595,6 +601,8 @@
           };
           const bodyText = contentAsText(normalized.content, normalized.charset);
           const analysis = window.EgMailOtp.analyze(normalized, bodyText);
+          
+          // FIXED: Only protect if recovery intent exists
           normalized.protectedMessage = analysis.protectedMessage;
           if (analysis.protectedMessage) normalized.subject = analysis.displaySubject;
           return normalized;
