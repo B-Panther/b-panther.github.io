@@ -384,13 +384,15 @@
     const truncated = source.length > 300000;
     const limited = truncated ? source.slice(0, 300000) : source;
     const decoded = decodeQuotedPrintable(limited, charset);
-    if (window.EgMailContent.hasFlattenedDocumentArtifacts(decoded)) {
+    const flattenedMarkup = window.EgMailContent.hasFlattenedDocumentArtifacts(decoded);
+    const strayDoctype = window.EgMailContent.hasDoctypeFragment(decoded) && !looksLikeHTML(decoded);
+    if (flattenedMarkup || strayDoctype) {
       const notice = document.createElement('span');
       notice.className = 'body-notice';
       notice.textContent = 'Email layout markup was simplified for safe, readable display.';
       const fallback = document.createElement('pre');
       fallback.className = 'plain-mail';
-      fallback.textContent = window.EgMailContent.cleanFlattenedDocumentText(decoded, charset)
+      fallback.textContent = window.EgMailContent.cleanFlattenedDocumentForDisplay(decoded, charset)
         || 'This email contains layout markup but no readable message text.';
       container.append(notice, fallback);
     } else if (looksLikeHTML(decoded)) {
@@ -403,7 +405,7 @@
       } else {
         const fallback = document.createElement('pre');
         fallback.className = 'plain-mail';
-        fallback.textContent = window.EgMailContent.cleanFlattenedDocumentText(decoded.replace(/<[^>]*>/g, ' '), charset).replace(/\s{3,}/g, '\n\n');
+        fallback.textContent = window.EgMailContent.cleanFlattenedDocumentForDisplay(decoded.replace(/<[^>]*>/g, ' '), charset);
         container.append(fallback);
       }
     } else {

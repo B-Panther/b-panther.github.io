@@ -105,6 +105,16 @@
     return text;
   }
 
+  function hasDoctypeFragment(input) {
+    return /(?:<\s*!\s*|!\s*|&lt;\s*!\s*)?doctype\s+html\b/i.test(String(input || ''));
+  }
+
+  function cleanFlattenedDocumentForDisplay(input, charset = 'utf-8') {
+    let text = cleanFlattenedDocumentText(input, charset);
+    text = text.replace(/(?:<\s*!\s*|!\s*|&lt;\s*!\s*)?doctype\s+html\b[\s\S]{0,800}?(?:\b(?:transitional|strict|xhtml)\b|>)/gi, ' ');
+    return text.replace(/[ \t]{2,}/g, ' ').replace(/\s{3,}/g, '\n\n').trim();
+  }
+
   function findBodyString(value, depth = 0) {
     if (typeof value === 'string') return value.trim() ? value : '';
     if (!value || typeof value !== 'object' || depth > 4) return '';
@@ -147,6 +157,8 @@
     looksLikeHTML,
     hasFlattenedDocumentArtifacts,
     cleanFlattenedDocumentText,
+    hasDoctypeFragment,
+    cleanFlattenedDocumentForDisplay,
     decodeEscapedMarkup,
     getMessageContent,
     getMessageCharset

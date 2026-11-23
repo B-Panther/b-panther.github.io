@@ -30,6 +30,17 @@ test('cleans broken flattened attributes without swallowing body copy after CSS'
   assert.match(clean, /You have 1 notification you may not have seen\./);
 });
 
+test('cleans a stripped DOCTYPE fragment in the middle of a flattened email for display only', () => {
+  const noisy = 'Suggested accounts for you. !DOCTYPE HTML PUBLIC - DTD HTML 4.01 Transitional posted something new. You have a notification.';
+  assert.equal(content.hasFlattenedDocumentArtifacts(noisy), false);
+  assert.equal(content.hasDoctypeFragment(noisy), true);
+  const clean = content.cleanFlattenedDocumentForDisplay(noisy);
+  assert.doesNotMatch(clean, /!?DOCTYPE|DTD HTML 4\.01|Transitional/i);
+  assert.match(clean, /Suggested accounts for you\./);
+  assert.match(clean, /posted something new\./);
+  assert.match(clean, /You have a notification\./);
+});
+
 test('does not classify ordinary plain text as flattened HTML', () => {
   const plain = 'Your Facebook group request has been approved. The reference is 123456.';
   assert.equal(content.hasFlattenedDocumentArtifacts(plain), false);
