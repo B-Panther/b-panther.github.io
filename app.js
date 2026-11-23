@@ -797,9 +797,9 @@
 
   try {
     const savedTheme = localStorage.getItem(STORAGE.theme);
-    updateTheme(savedTheme || (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'), false);
+    updateTheme(savedTheme || 'light', false);
     els.autoRefreshToggle.checked = localStorage.getItem(STORAGE.autoRefresh) === 'true';
-  } catch (_) { updateTheme('dark'); }
+  } catch (_) { updateTheme('light'); }
   renderSaved();
   updateAddressUI();
   renderMessages();

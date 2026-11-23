@@ -18,7 +18,7 @@
     user: null,
     csrfToken: '',
     addresses: [],
-    settings: { theme: 'dark', autoRefresh: false },
+    settings: { theme: 'light', autoRefresh: false },
     onChange: null,
     mode: 'login'
   };
@@ -90,7 +90,7 @@
       request('/api/account/settings')
     ]);
     state.addresses = Array.isArray(addressData.addresses) ? addressData.addresses : [];
-    state.settings = settingsData.settings || { theme: 'dark', autoRefresh: false };
+    state.settings = settingsData.settings || { theme: 'light', autoRefresh: false };
   }
 
   async function notify(detail = {}) {
@@ -113,7 +113,7 @@
       if (state.authenticated) await loadAccountData();
       else {
         state.addresses = [];
-        state.settings = { theme: 'dark', autoRefresh: false };
+        state.settings = { theme: 'light', autoRefresh: false };
       }
       renderView();
       await notify({ justAuthenticated: false });
@@ -147,7 +147,7 @@
     try { await loadAccountData(); }
     catch (_) {
       state.addresses = [];
-      state.settings = { theme: 'dark', autoRefresh: false };
+      state.settings = { theme: 'light', autoRefresh: false };
     }
     renderView();
     if (typeof els.dialog.close === 'function') els.dialog.close();
@@ -252,7 +252,7 @@
       state.authenticated = false;
       state.user = null;
       state.addresses = [];
-      state.settings = { theme: 'dark', autoRefresh: false };
+      state.settings = { theme: 'light', autoRefresh: false };
       renderView();
       await notify();
       els.dialog.close();
