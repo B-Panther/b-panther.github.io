@@ -23,7 +23,7 @@
     listPageNote: $('#listPageNote'), listFooter: $('#listFooter'), messageLayout: $('#messageLayout'), detailPanel: $('#detailPanel'),
     detailPlaceholder: $('#detailPlaceholder'), detailContent: $('#detailContent'), detailSubject: $('#detailSubject'), detailFrom: $('#detailFrom'),
     detailDate: $('#detailDate'), senderAvatar: $('#senderAvatar'), messageBody: $('#messageBody'), inboxStatus: $('#inboxStatus'),
-    themeToggle: $('#themeToggle'), privacyButton: $('#privacyButton'), noticeMore: $('#noticeMore'), footerPrivacy: $('#footerPrivacy'),
+    themeToggle: $('#themeToggle'), privacyButton: $('#privacyButton'), noticeMore: $('#noticeMore'), footerPrivacy: $('#footerPrivacy'), footerShare: $('#footerShare'),
     privacyDialog: $('#privacyDialog'), closePrivacy: $('#closePrivacy'), privacyDone: $('#privacyDone'), backToList: $('#backToList'), toast: $('#toast')
   };
 
@@ -779,6 +779,25 @@
   els.sortSelect.addEventListener('change', renderMessages);
   els.themeToggle.addEventListener('click', () => updateTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'));
   [els.privacyButton, els.noticeMore, els.footerPrivacy].forEach((button) => button.addEventListener('click', openPrivacy));
+  els.footerShare.addEventListener('click', async () => {
+    const shareData = {
+      title: 'EgMail — Disposable Email Inbox',
+      text: 'Need a quick disposable inbox? Try EgMail. #EgMail #TempMail #DisposableEmail',
+      url: 'https://www.egmail.me/'
+    };
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData);
+        showToast('Thanks for sharing EgMail!');
+      } else {
+        await navigator.clipboard.writeText(`${shareData.text} ${shareData.url}`);
+        showToast('EgMail share message copied with hashtags.');
+      }
+    } catch (error) {
+      if (error && error.name === 'AbortError') return;
+      window.prompt('Copy this EgMail share message:', `${shareData.text} ${shareData.url}`);
+    }
+  });
   [els.closePrivacy, els.privacyDone].forEach((button) => button.addEventListener('click', () => els.privacyDialog.close()));
   els.privacyDialog.addEventListener('click', (event) => {
     if (event.target === els.privacyDialog) els.privacyDialog.close();
